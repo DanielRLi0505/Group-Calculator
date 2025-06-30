@@ -1,5 +1,5 @@
 import { Title } from "@solidjs/meta";
-import { createEffect, createSignal } from "solid-js";
+import { createEffect, createSignal, Index } from "solid-js";
 
 
 export default function Home() {
@@ -7,7 +7,7 @@ export default function Home() {
   const [entries, setEntries] = createSignal<number[]>([]);
   const [secondEntry, setSecondEntry] = createSignal<number>(0);
   const [results, setResults] = createSignal<number[]>([]);
-  type Operation = "add" | "subtract" | "multiply" | "divide" | "modulo" | "power" | "avg" | "groupdiscount";
+  type Operation = "add" | "subtract" | "multiply" | "divide" | "modulo" | "power" | "groupdiscount";
   const [operation, setOperation] = createSignal<Operation>("add");
   const [multipleOperators, setMultipleOperators] = createSignal<boolean>(false);
   const [operations, setOperations] = createSignal<Operation[]>([]);
@@ -21,6 +21,7 @@ export default function Home() {
   const [groupDiscountRefs, setGroupDiscountRefs] = createSignal<(HTMLInputElement | null)[]>([]);
   const [discounts, setDiscounts] = createSignal<number[]>([]);
   const [groupThresholds, setGroupThresholds] = createSignal<number[]>([]);
+
   const OP_DICT: Record<Operation, (a: number, b: number) => number> = {
     add: (a: number, b: number) => {
       return a + b;
@@ -39,9 +40,6 @@ export default function Home() {
     },
     power: (a: number, b: number) => {
       return Math.pow(a, b);
-    },
-    avg: (a: number, b: number) => {
-      return entries().reduce((acc, curr) => acc + curr, 0) / entries().length;
     },
     groupdiscount: (a: number, b: number) => {
       if (a < groupThreshold()) {
@@ -63,7 +61,6 @@ export default function Home() {
     multiply: "*",
     divide: "/",
     power: "^",
-    avg: "Average",
     groupdiscount: "Group Discount",
     modulo: "% (modulo)",
   };
@@ -128,30 +125,9 @@ export default function Home() {
     console.log(operations().toString());
   };
 
-  const moveToNextInputFieldOnEnter = (e: KeyboardEvent, index: number) => {
+  const nextField = (e: KeyboardEvent, index: number, refs: (HTMLInputElement | HTMLSelectElement | null)[]) => {
     if (e.key === "Enter") {
       e.preventDefault();
-      const refs = inputRefs();
-      if (refs[index + 1]) {
-        refs[index + 1]?.focus();
-      }
-    }
-  };
-
-  const moveToNextSecondInputFieldOnEnter = (e: KeyboardEvent, index: number) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      const refs = secondInputRefs();
-      if (refs[index + 1]) {
-        refs[index + 1]?.focus();
-      }
-    }
-  };
-
-  const moveToNextGroupDiscountInputFieldOnEnter = (e: KeyboardEvent, index: number) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      const refs = groupDiscountRefs();
       if (refs[index + 1]) {
         refs[index + 1]?.focus();
       }
@@ -179,9 +155,6 @@ export default function Home() {
         } else {
           result = OP_DICT[op](a, b);
         }
-      } else if (op === "avg" && multipleOperators()) {
-        error = "Cannot calculate average with multiple operations";
-        result = 0;
       } else {
         result = op in OP_DICT ? OP_DICT[op](a, b) : OP_DICT["add"](a, b);
       }
@@ -193,6 +166,42 @@ export default function Home() {
     setErrors(errs);
     setResults(res);
   });
+
+  const avg = (entries: number[]): number => {
+    if (entries.length === 0) return 0;
+    const sum = entries.reduce((acc, curr) => acc + curr, 0);
+    return sum / entries.length;
+  };
+
+  const median = (entries: number[]): number => {
+    if (entries.length === 0) return 0;
+    const sorted = [...entries].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    if (sorted.length % 2 === 0) {
+      return (sorted[mid - 1] + sorted[mid]) / 2;
+    } else {
+      return sorted[mid];
+    }
+  };
+
+  const mode = (entries: number[]): number => {
+    if (entries.length === 0) return 0;
+    const frequency: { [key: number]: number } = {};
+    let maxFreq = 0;
+    let modes: number[] = [];
+
+    for (const num of entries) {
+      frequency[num] = (frequency[num] || 0) + 1;
+      if (frequency[num] > maxFreq) {
+        maxFreq = frequency[num];
+        modes = [num];
+      } else if (frequency[num] === maxFreq) {
+        modes.push(num);
+      }
+    }
+
+    return modes.length === 1 ? modes[0] : 0;
+  };
 
   return (
     <main>
@@ -214,7 +223,19 @@ export default function Home() {
               type="checkbox"
               checked={multipleModifiers()}
               onChange={(e) => {
-                setMultipleModifiers(e.currentTarget.checked);
+                const checked = e.currentTarget.checked;
+                setMultipleModifiers(checked);
+                if (checked) {
+                  // Switching ON: preserve the current operation as the first
+                  const currentModifier = secondEntry();
+                  const mods = Array.from({ length: numEntries() }, (_, i) =>
+                    i === 0 ? currentModifier : 0
+                  );
+                  setSecondEntries(mods);
+                } else {
+                  // Switching OFF: preserve the first operation as the single
+                  setSecondEntry(secondEntries()[0] ?? 0);
+                }
                 createEntries();
               }}
             />
@@ -225,12 +246,29 @@ export default function Home() {
               type="checkbox"
               checked={multipleOperators()}
               onChange={(e) => {
-                setMultipleOperators(e.currentTarget.checked);
+                const checked = e.currentTarget.checked;
+                setMultipleOperators(checked);
+                if (checked) {
+                  // Switching ON: preserve the current operation as the first
+                  const currentOp = operation();
+                  const ops = Array.from({ length: numEntries() }, (_, i) =>
+                    i === 0 ? currentOp : "add"
+                  );
+                  setOperations(ops);
+                } else {
+                  // Switching OFF: preserve the first operation as the single
+                  setOperation(operations()[0] ?? "add");
+                }
                 createEntries();
               }}
             />
             Multiple operators?
           </label>
+        </div>
+        <br/>
+        <div>
+          <p>Entries Average: {avg(entries())}, Entries Median: {median(entries())}, Entries Mode: {mode(entries())}</p>
+          <p>Results Average: {avg(results())}, Results Median: {median(results())}, Results Mode: {mode(results())}</p>
         </div>
         <br/>
         <div class="calc-row">
@@ -260,194 +298,253 @@ export default function Home() {
               </tr>
             </thead>
             <tbody>
-              {entries().map((entry, index) => (
-                <tr>
-                  <td>
-                    <input
-                      ref={e1 => {
-                        const refs = [...inputRefs()];
-                        refs[index] = e1;
-                        setInputRefs(refs);
-                      }}
-                      type="number"
-                      value={entry}
-                      onChange={(e) => {
-                        const newEntries = [...entries()];
-                        newEntries[index] = parseFloat(e.currentTarget.value);
-                        setEntries(newEntries);
-                      }}
-                      onKeyDown={e => moveToNextInputFieldOnEnter(e, index)}
-                    />
-                  </td>
-                  <td>
-                    {index === 0 && !multipleOperators() &&
-                      <select value={operation()} onChange={(e) => setOperation(e.currentTarget.value as Operation)}>
-                        <option value="add">+</option>
-                        <option value="subtract">-</option>
-                        <option value="multiply">*</option>
-                        <option value="divide">/</option>
-                        <option value="modulo">%</option>
-                        <option value="avg">Average</option>
-                        <option value="power">^</option>
-                        <option value="groupdiscount">Group Discount</option>
-                      </select>
-                    }
-                    {index !== 0 && !multipleOperators() && (
-                      <span>{OP_STR_DICT[operation()]}</span>
-                    )}
-                    {multipleOperators() &&
-                      <select value={operations()[index]} onChange={(e) => {
-                        const newOperations = [...operations()];
-                        newOperations[index] = e.currentTarget.value as Operation;
-                        setOperations(newOperations);
-                      }}>
-                        <option value="add">+</option>
-                        <option value="subtract">-</option>
-                        <option value="multiply">*</option>
-                        <option value="divide">/</option>
-                        <option value="modulo">%</option>
-                        <option value="avg">Average</option>
-                        <option value="power">^</option>
-                        <option value="groupdiscount">Group Discount</option>
-                      </select>
-                    }
-                  </td>
-                  <td>
-                    {index === 0 && operation() !== "groupdiscount" && operation() !== "avg" && !multipleModifiers() &&
-                      <input
-                        type="number"
-                        value={secondEntry()}
-                        onChange={(e) => {
-                          setSecondEntry(parseFloat(e.currentTarget.value))}
+              <Index each={entries()} fallback={<tr><td colSpan={4}>Enter how many calculations you would like to do.</td></tr>}>
+                {(entry, index) => (
+                  <>
+                    <tr>
+                      <td>
+                        <input
+                          ref={e1 => {
+                              const newRefs = [...inputRefs()];
+                              newRefs[index] = e1;
+                              setInputRefs(newRefs);
+                            }
+                          }
+                          type="number"
+                          value={entry()}
+                          onChange={(e) => {
+                            const newEntries = [...entries()];
+                            newEntries[index] = parseFloat(e.currentTarget.value);
+                            setEntries(newEntries);
+                          }}
+                          onKeyDown={e => nextField(e, index, inputRefs())}
+                        />
+                      </td>
+                      <td>
+                        {index === 0 && !multipleOperators() &&
+                          <select value={operation()} onChange={(e) => setOperation(e.currentTarget.value as Operation)}>
+                            <option value="add">+</option>
+                            <option value="subtract">-</option>
+                            <option value="multiply">*</option>
+                            <option value="divide">/</option>
+                            <option value="modulo">%</option>
+                            <option value="power">^</option>
+                            <option value="groupdiscount">Group Discount</option>
+                          </select>
                         }
-                    />}
-                    {index === 0 && operation() === "groupdiscount" && !multipleModifiers() &&
-                      <div class="grdsc">
-                        <span class="grdsc-row">
+                        {index !== 0 && !multipleOperators() && (
+                          <span>{OP_STR_DICT[operation()]}</span>
+                        )}
+                        {multipleOperators() &&
+                          <select value={operations()[index]} onChange={(e) => {
+                            const newOperations = [...operations()];
+                            newOperations[index] = e.currentTarget.value as Operation;
+                            setOperations(newOperations);
+                          }}>
+                            <option value="add">+</option>
+                            <option value="subtract">-</option>
+                            <option value="multiply">*</option>
+                            <option value="divide">/</option>
+                            <option value="modulo">%</option>
+                            <option value="power">^</option>
+                            <option value="groupdiscount">Group Discount</option>
+                          </select>
+                        }
+                      </td>
+                      <td>
+                        {index === 0 && operation() !== "groupdiscount" && !multipleModifiers() &&
                           <input
-                            ref={e1 => {
-                              const refs = [...groupDiscountRefs()];
-                              refs[index] = e1;
-                              setGroupDiscountRefs(refs);
-                            }}
                             type="number"
                             value={secondEntry()}
-                            onChange={(e) => setSecondEntry(parseFloat(e.currentTarget.value))}
-                            onKeyDown={(e) => moveToNextGroupDiscountInputFieldOnEnter(e, index)}
-                          />
-                          <p> {" normally, "} </p>
-                        </span>
-                        <span class="grdsc-row">
-                          <input
-                            ref={e1 => {
-                              const refs = [...groupDiscountRefs()];
-                              refs[index] = e1;
-                              setGroupDiscountRefs(refs);
-                            }}
-                            type="number"
-                            value={discount()}
-                            onChange={(e) => setDiscount(parseFloat(e.currentTarget.value))}
-                            onKeyDown={(e) => moveToNextGroupDiscountInputFieldOnEnter(e, index)}
-                          />
-                          <p> {" if >= "} </p>
-                          <input
-                            ref={e1 => {
-                              const refs = [...groupDiscountRefs()];
-                              refs[index] = e1;
-                              setGroupDiscountRefs(refs);
-                            }}
-                            type="number"
-                            value={groupThreshold()}
-                            onChange={(e) => setGroupThreshold(parseFloat(e.currentTarget.value))}
-                            onKeyDown={(e) => moveToNextGroupDiscountInputFieldOnEnter(e, index)}
-                          />
-                        </span>
-                      </div>
-                    }
-                    {index !== 0 && operation() !== "avg" && !multipleModifiers() && (
-                      <span>{secondEntry() !== null ? secondEntry() : 0}</span>
-                    )}
-                    {multipleModifiers() && operation() !== "groupdiscount" &&
-                      <input
-                        ref={e2 => {
-                          const refs = [...secondInputRefs()];
-                          refs[index] = e2;
-                          setSecondInputRefs(refs);
-                        }}
-                        type="number"
-                        value={secondEntries()[index]}
-                        onChange={(e) => {
-                          const newEntries = [...secondEntries()];
-                          newEntries[index] = parseFloat(e.currentTarget.value);
-                          setSecondEntries(newEntries);
-                        }}
-                        onKeyDown={e => moveToNextSecondInputFieldOnEnter(e, index)}
-                      />
-                    }
-                    {(multipleModifiers() || multipleOperators()) && operation() === "groupdiscount" &&
-                      <div class="grdsc">
-                        <span class="grdsc-row">
-                          <input
-                            ref={e2 => {
-                              const refs = [...groupDiscountRefs()];
-                              refs[index] = e2;
-                              setGroupDiscountRefs(refs);
-                            }}
-                            type="number"
-                            value={secondEntries()[index]}
                             onChange={(e) => {
-                              const newEntries = [...secondEntries()];
-                              newEntries[index] = parseFloat(e.currentTarget.value);
-                              setSecondEntries(newEntries);
-                            }}
-                            onKeyDown={e => moveToNextGroupDiscountInputFieldOnEnter(e, index)}
-                          />
-                          <p> {" normally, "} </p>
-                        </span>
-                        <span class="grdsc-row">
-                          <input
-                            ref={e2 => {
-                              const refs = [...groupDiscountRefs()];
-                              refs[index] = e2;
-                              setGroupDiscountRefs(refs);
-                            }}
-                            type="number"
-                            value={discounts()[index]}
-                            onChange={(e) => {
-                              const newDiscounts = [...discounts()];
-                              newDiscounts[index] = parseFloat(e.currentTarget.value);
-                              setDiscounts(newDiscounts);
-                            }}
-                            onKeyDown={e => moveToNextSecondInputFieldOnEnter(e, index)}
-                          />
-                          <p> {" if >= "} </p>
-                          <input
-                            ref={e2 => {
-                              const refs = [...groupDiscountRefs()];
-                              refs[index] = e2;
-                              setGroupDiscountRefs(refs);
-                            }}
-                            type="number"
-                            value={groupThresholds()[index]}
-                            onChange={(e) => {
-                              const newGroupThresholds = [...groupThresholds()];
-                              newGroupThresholds[index] = parseFloat(e.currentTarget.value);
-                              setGroupThresholds(newGroupThresholds);
-                            }}
-                            onKeyDown={e => moveToNextSecondInputFieldOnEnter(e, index)}
-                          />
-                        </span>
-                      </div>
-                    }
-                  </td>
-                  <td>
-                    {errors()[index]
-                      ? <span>{errors()[index]}</span>
-                      : <span>{results()[index]}</span>
-                    }
-                  </td>
-                </tr>
-              ))}
+                              setSecondEntry(parseFloat(e.currentTarget.value))}
+                            }
+                        />}
+                        {index === 0 && operation() === "groupdiscount" && !multipleModifiers() && !multipleOperators() &&
+                          <div class="grdsc">
+                            <span class="grdsc-row">
+                              <input
+                                ref={e1 => {
+                                  const refs = [...groupDiscountRefs()];
+                                  refs[index * 3 + 0] = e1;
+                                  setGroupDiscountRefs(refs);
+                                }}
+                                type="number"
+                                value={secondEntry()}
+                                onChange={(e) => setSecondEntry(parseFloat(e.currentTarget.value))}
+                                onKeyDown={(e) => nextField(e, index * 3 + 0, groupDiscountRefs())}
+                              />
+                              <p> {" normally, "} </p>
+                            </span>
+                            <span class="grdsc-row">
+                              <input
+                                ref={e1 => {
+                                  const refs = [...groupDiscountRefs()];
+                                  refs[index * 3 + 1] = e1;
+                                  setGroupDiscountRefs(refs);
+                                }}
+                                type="number"
+                                value={discount()}
+                                onChange={(e) => setDiscount(parseFloat(e.currentTarget.value))}
+                                onKeyDown={(e) => nextField(e, index * 3 + 1, groupDiscountRefs())}
+                              />
+                              <p> {" if >= "} </p>
+                              <input
+                                ref={e1 => {
+                                  const refs = [...groupDiscountRefs()];
+                                  refs[index * 3 + 2] = e1;
+                                  setGroupDiscountRefs(refs);
+                                }}
+                                type="number"
+                                value={groupThreshold()}
+                                onChange={(e) => setGroupThreshold(parseFloat(e.currentTarget.value))}
+                                onKeyDown={(e) => nextField(e, index * 3 + 2, groupDiscountRefs())}
+                              />
+                            </span>
+                          </div>
+                        }
+                        {index !== 0 && !multipleModifiers() && (
+                          <span>{secondEntry() !== null ? secondEntry() : 0}</span>
+                        )}
+                        {multipleModifiers() &&
+                          ((multipleOperators() ? operations()[index] : operation()) !== "groupdiscount") && (
+                            <input
+                              ref={e2 => {
+                                const refs = [...secondInputRefs()];
+                                refs[index] = e2;
+                                setSecondInputRefs(refs);
+                              }}
+                              type="number"
+                              value={secondEntries()[index]}
+                              onChange={(e) => {
+                                const newEntries = [...secondEntries()];
+                                newEntries[index] = parseFloat(e.currentTarget.value);
+                                setSecondEntries(newEntries);
+                              }}
+                              onKeyDown={e => nextField(e, index, secondInputRefs())}
+                            />
+                        )}
+                        {multipleModifiers() && !multipleOperators() && operation() === "groupdiscount" &&
+                          <div class="grdsc">
+                            <span class="grdsc-row">
+                              <input
+                                ref={e2 => {
+                                  const refs = [...groupDiscountRefs()];
+                                  refs[index * 3 + 0] = e2;
+                                  setGroupDiscountRefs(refs);
+                                }}
+                                type="number"
+                                value={secondEntries()[index]}
+                                onChange={(e) => {
+                                  const newEntries = [...secondEntries()];
+                                  newEntries[index] = parseFloat(e.currentTarget.value);
+                                  setSecondEntries(newEntries);
+                                }}
+                                onKeyDown={e => nextField(e, index * 3 + 0, groupDiscountRefs())}
+                              />
+                              <p> {" normally, "} </p>
+                            </span>
+                            <span class="grdsc-row">
+                              <input
+                                ref={e2 => {
+                                  const refs = [...groupDiscountRefs()];
+                                  refs[index * 3 + 1] = e2;
+                                  setGroupDiscountRefs(refs);
+                                }}
+                                type="number"
+                                value={discounts()[index]}
+                                onChange={(e) => {
+                                  const newDiscounts = [...discounts()];
+                                  newDiscounts[index] = parseFloat(e.currentTarget.value);
+                                  setDiscounts(newDiscounts);
+                                }}
+                                onKeyDown={e => nextField(e, index * 3 + 1, groupDiscountRefs())}
+                              />
+                              <p> {" if >= "} </p>
+                              <input
+                                ref={e2 => {
+                                  const refs = [...groupDiscountRefs()];
+                                  refs[index * 3 + 2] = e2;
+                                  setGroupDiscountRefs(refs);
+                                }}
+                                type="number"
+                                value={groupThresholds()[index]}
+                                onChange={(e) => {
+                                  const newGroupThresholds = [...groupThresholds()];
+                                  newGroupThresholds[index] = parseFloat(e.currentTarget.value);
+                                  setGroupThresholds(newGroupThresholds);
+                                }}
+                                onKeyDown={e => nextField(e, index * 3 + 2, groupDiscountRefs())}
+                              />
+                            </span>
+                          </div>
+                        }
+                        {multipleOperators() && multipleOperators() && operations()[index] === "groupdiscount" && 
+                          <div class="grdsc">
+                            <span class="grdsc-row">
+                              <input
+                                ref={e2 => {
+                                  const refs = [...groupDiscountRefs()];
+                                  refs[index * 3 + 0] = e2;
+                                  setGroupDiscountRefs(refs);
+                                }}
+                                type="number"
+                                value={secondEntries()[index]}
+                                onChange={(e) => {
+                                  const newEntries = [...secondEntries()];
+                                  newEntries[index] = parseFloat(e.currentTarget.value);
+                                  setSecondEntries(newEntries);
+                                }}
+                                onKeyDown={e => nextField(e, index * 3 + 0, groupDiscountRefs())}
+                              />
+                              <p> {" normally, "} </p>
+                            </span>
+                            <span class="grdsc-row">
+                              <input
+                                ref={e2 => {
+                                  const refs = [...groupDiscountRefs()];
+                                  refs[index * 3 + 1] = e2;
+                                  setGroupDiscountRefs(refs);
+                                }}
+                                type="number"
+                                value={discounts()[index]}
+                                onChange={(e) => {
+                                  const newDiscounts = [...discounts()];
+                                  newDiscounts[index] = parseFloat(e.currentTarget.value);
+                                  setDiscounts(newDiscounts);
+                                }}
+                                onKeyDown={e => nextField(e, index * 3 + 1, groupDiscountRefs())}
+                              />
+                              <p> {" if >= "} </p>
+                              <input
+                                ref={e2 => {
+                                  const refs = [...groupDiscountRefs()];
+                                  refs[index * 3 + 2] = e2;
+                                  setGroupDiscountRefs(refs);
+                                }}
+                                type="number"
+                                value={groupThresholds()[index]}
+                                onChange={(e) => {
+                                  const newGroupThresholds = [...groupThresholds()];
+                                  newGroupThresholds[index] = parseFloat(e.currentTarget.value);
+                                  setGroupThresholds(newGroupThresholds);
+                                }}
+                                onKeyDown={e => nextField(e, index * 3 + 2, groupDiscountRefs())}
+                              />
+                            </span>
+                          </div>
+                        }
+                      </td>
+                      <td>
+                        {errors()[index]
+                          ? <span>{errors()[index]}</span>
+                          : <span>{results()[index]}</span>
+                        }
+                      </td>
+                    </tr>
+                  </>
+                )}
+              </Index>
             </tbody>
           </table>
           
