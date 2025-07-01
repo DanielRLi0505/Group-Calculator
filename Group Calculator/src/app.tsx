@@ -9,6 +9,8 @@ export default function App() {
     <Router
       root={props => (
         <MetaProvider>
+          <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7263594566763413"
+            crossorigin="anonymous"></script>
           <Title>SolidStart - Basic</Title>
           <a href="/">Index</a>
           <a href="/about">About</a>
