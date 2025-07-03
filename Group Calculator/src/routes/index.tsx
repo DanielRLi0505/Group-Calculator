@@ -5,6 +5,8 @@ import { createEffect, createSignal, Index } from "solid-js";
 export default function Home() {
   const [numEntries, setNumEntries] = createSignal(0);
   const [entries, setEntries] = createSignal<number[]>([]);
+  const [loneEntry, setLoneEntry] = createSignal<number>(0);
+  const [multipleEntries, setMultipleEntries] = createSignal<boolean>(true);
   const [secondEntry, setSecondEntry] = createSignal<number>(0);
   const [results, setResults] = createSignal<number[]>([]);
   type Operation = "add" | "subtract" | "multiply" | "divide" | "modulo" | "power" | "groupdiscount";
@@ -140,7 +142,7 @@ export default function Home() {
 
     for (let i = 0; i < entries().length; i++) {
       let op: Operation = multipleOperators() ? operations()[i] : operation();
-      let a = entries()[i];
+      let a = multipleEntries() ? entries()[i] : loneEntry();
       let b = multipleModifiers()
         ? secondEntries()[i]
         : (operation() === "groupdiscount" ? secondEntry() : secondEntry());
@@ -221,6 +223,29 @@ export default function Home() {
           <label>
             <input
               type="checkbox"
+              checked={multipleEntries()}
+              onChange={(e) => {
+                const checked = e.currentTarget.checked;
+                setMultipleEntries(checked);
+                if (checked) {
+                  // Switching ON: preserve the first entry as the first, rest as 0
+                  const currentEntry = loneEntry();
+                  const newEntries = Array.from({ length: numEntries() }, (_, i) =>
+                    i === 0 ? currentEntry : 0
+                  );
+                  setEntries(newEntries);
+                } else {
+                  // Switching OFF: preserve the first entry as the single
+                  setLoneEntry(entries()[0] ?? 0);
+                }
+                createEntries();
+              }}
+            />
+            Multiple entries?
+          </label>
+          <label>
+            <input
+              type="checkbox"
               checked={multipleModifiers()}
               onChange={(e) => {
                 const checked = e.currentTarget.checked;
@@ -262,6 +287,8 @@ export default function Home() {
                 createEntries();
               }}
             />
+
+            
             Multiple operators?
           </label>
         </div>
@@ -303,22 +330,36 @@ export default function Home() {
                   <>
                     <tr>
                       <td>
-                        <input
-                          ref={e1 => {
-                              const newRefs = [...inputRefs()];
-                              newRefs[index] = e1;
-                              setInputRefs(newRefs);
+                        {multipleEntries() && 
+                          <input
+                            ref={e1 => {
+                                const newRefs = [...inputRefs()];
+                                newRefs[index] = e1;
+                                setInputRefs(newRefs);
+                              }
                             }
-                          }
-                          type="number"
-                          value={entry()}
-                          onChange={(e) => {
-                            const newEntries = [...entries()];
-                            newEntries[index] = parseFloat(e.currentTarget.value);
-                            setEntries(newEntries);
-                          }}
-                          onKeyDown={e => nextField(e, index, inputRefs())}
-                        />
+                            type="number"
+                            value={entries()[index]}
+                            onChange={(e) => {
+                              const newEntries = [...entries()];
+                              newEntries[index] = parseFloat(e.currentTarget.value);
+                              setEntries(newEntries);
+                            }}
+                            onKeyDown={e => nextField(e, index, inputRefs())}
+                          />
+                        }
+                        {!multipleEntries() && index === 0 && 
+                          <input
+                            type="number"
+                            value={loneEntry()}
+                            onChange={(e) => {
+                              setLoneEntry(parseFloat(e.currentTarget.value))}
+                            }
+                          />
+                        }
+                        {!multipleEntries() && index !== 0 && (
+                          <span>{loneEntry()}</span>
+                        )}
                       </td>
                       <td>
                         {index === 0 && !multipleOperators() &&
