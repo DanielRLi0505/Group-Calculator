@@ -5,19 +5,29 @@ export default function About() {
     <main>
       <Title>About</Title>
       <h1>About</h1>
-      <h2>How to Use</h2>
+      <h2>What is this app?</h2>
       <p>
-        This calculator allows you to perform operations on a list of numbers.
-        You can add, subtract, multiply, divide, or calculate the average of
-        these numbers. Additionally, you can apply a group discount based on the
-        number of entries.
+        This is an app that allows users to perform batch calculations
+        without the need for repetitive inputs.
       </p>
       <h2>Why was this made?</h2>
       <p>
-        This calculator was created to simplify the process of performing
-        calculations on multiple numbers, especially in group settings. It
-        aims to provide a user-friendly interface for managing and computing
-        various mathematical operations efficiently.
+        This calculator was made to streamline repetitive calculations.
+        Whether it's adding the same number to several different ones,
+        demonstrating how to compare fractions, or showing each different
+        operation on the same set of numbers, this calculator can make
+        it so much easier to calculate these things without having to keep
+        typing the same inputs.
+      </p>
+      <h2>How to Use</h2>
+      <p>
+        By default, you can enter multiple numbers to perform a single
+        calculation on.  Just enter how many calculations you would like
+        to perform, and each row will be created.  If you would like to 
+        modify only one number in various ways, uncheck the "multiple 
+        entries" box.  If you would like to perform different operations, 
+        check the "multiple operations" box.  If you would like to modify 
+        any number with multiple, check the "multiple modifiers" box.
       </p>
     </main>
   );

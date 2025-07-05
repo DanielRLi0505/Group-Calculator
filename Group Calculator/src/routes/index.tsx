@@ -209,6 +209,15 @@ export default function Home() {
     <main>
       <Title>Group Calculator</Title>
       <h1>Group Calculator</h1>
+      <section class="intro">
+        <h2>Welcome!</h2>
+        <p>
+          This is the Group Calculator, a simple way to perform repetitive
+          calculations in a batch.  Enter how many calculations you
+          would like to do, and then enter your numbers, modifiers, and
+          operators!
+        </p>
+      </section>
       <div class="calc-body">
         <div class="calc-row">
           <input

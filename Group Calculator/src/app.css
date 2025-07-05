@@ -12,6 +12,10 @@ main {
   margin: 0 auto;
 }
 
+.intro {
+  text-align: center;
+}
+
 h1 {
   color: #961934;
   text-transform: uppercase;
